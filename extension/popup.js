@@ -1,4 +1,5 @@
 import * as db from './lib/db.js';
+import { animate } from './vendor/motion.mjs';
 import { DEFAULTS, STALE_MS, BIG_RESTORE, counts, ago, plural, search, missingTabs } from './lib/core.js';
 import { APP } from './lib/app.js';
 
@@ -12,6 +13,7 @@ let cfg = DEFAULTS, current = null, dupeIds = [], index = [], prevSnap = null;
 // ---------- the record ----------
 
 function renderState(s) {
+  if (viewing) return;
   const el = $('state');
   $('startBtn').hidden = !!s.started;
   if (!s.started) {
@@ -35,31 +37,177 @@ function renderState(s) {
   }
 }
 
-function renderMap(snap) {
+// ---------- moment 1: the card stack ----------
+
+const SPRING = { type: 'spring', bounce: 0, duration: 0.35 };   // apple-design default: critically damped
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let shown = null; // fingerprint of what the stack shows, so only real changes animate
+
+function renderMap(snap, { animate: anim = true } = {}) {
   const map = $('map');
-  map.replaceChildren();
-  if (!snap) return;
-  for (const w of snap.windows.slice(0, 6)) {
-    const row = document.createElement('div');
-    row.className = 'w';
-    const max = 26;
+  if (!snap) { map.replaceChildren(); return; }
+  const before = new Map([...map.querySelectorAll('.w')].map((w) => [w.dataset.key, w.querySelectorAll('.t').length]));
+  const wins = [...snap.windows].sort((a, b) => (a.focused ? 1 : 0) - (b.focused ? 1 : 0)).slice(-5); // the window you are in sits in front
+  map.replaceChildren(...wins.map((w, wi) => {
+    const card = document.createElement('div');
+    card.className = 'w';
+    card.dataset.key = String(w.id ?? wi);
+    const chips = document.createElement('div');
+    chips.className = 'chips';
+    const max = 24;
     for (const t of w.tabs.slice(0, max)) {
       const s = document.createElement('span');
       s.className = 't' + (t.pinned ? ' pin' : '') + (t.active && w.focused ? ' on' : '') + (t.g != null ? ' g-' + (w.groups[t.g]?.color || 'grey') : '');
-      row.append(s);
+      chips.append(s);
     }
     if (w.tabs.length > max) {
       const m = document.createElement('span');
       m.className = 'more';
       m.textContent = `+${w.tabs.length - max}`;
-      row.append(m);
+      chips.append(m);
     }
-    map.append(row);
+    const lines = document.createElement('div');
+    lines.className = 'lines';
+    lines.innerHTML = '<i></i><i></i>';
+    card.append(chips, lines);
+    if (w.name) { const n = document.createElement('span'); n.className = 'wname'; n.textContent = w.name; card.append(n); }
+    return card;
+  }));
+  // New tabs grow in from the left of their card; a new window card drops onto the stack.
+  if (anim && !still && shown !== null) {
+    for (const card of map.querySelectorAll('.w')) {
+      const had = before.get(card.dataset.key);
+      const chips = [...card.querySelectorAll('.t')];
+      if (had == null) animate(card, { opacity: [0, 1], y: [-8, 0] }, SPRING);
+      else if (chips.length > had) animate(chips.slice(had), { scaleX: [0, 1], opacity: [0, 1] }, SPRING);
+    }
   }
+  shown = snap.t;
   const c = counts(snap);
-  $('counts').textContent = [plural(c.windows, 'window'), plural(c.tabs, 'tab'), c.groups ? plural(c.groups, 'group') : ''].filter(Boolean).join(' · ')
-    + (snap.windows.length > 6 ? ` (map shows 6 windows)` : '');
+  setCounts(c, snap.windows.length > 5);
 }
+
+let lastCounts = null;
+function setCounts(c, more) {
+  const text = (x) => [plural(x.windows, 'window'), plural(x.tabs, 'tab'), x.groups ? plural(x.groups, 'group') : ''].filter(Boolean).join(' · ') + (more ? ' (5 shown)' : '');
+  const from = lastCounts;
+  lastCounts = c;
+  if (!from || still || from.tabs === c.tabs) { $('counts').textContent = text(c); return; }
+  // A changed number counts to its new value instead of swapping (apple-design: continuous feedback).
+  animate(from.tabs, c.tabs, { duration: 0.3, ease: 'easeOut', onUpdate: (v) => { $('counts').textContent = text({ ...c, tabs: Math.round(v) }); } });
+}
+
+// ---------- moment 2: the ribbon scrubber ----------
+// Drag through every save of the last 24 hours; the card stack shows that moment. Let go and the
+// ribbon springs back to now, carrying the drag's velocity (apple-design §3, §5, §6).
+
+let ticks = [];            // [{ x (0..1), id, t, boot }]
+let notchX = 1;            // position 0..1 along the track
+let viewing = null;
+const DAY = 24 * 3600_000;
+
+function renderScrubber(snaps) {
+  const now = Date.now();
+  const recent = snaps.filter((s) => now - s.t < DAY);
+  ticks = recent.map((s) => ({ x: 1 - (now - s.t) / DAY, id: s.id, t: s.t, boot: s.boot, d: s.d }));
+  $('scrub').hidden = ticks.length < 2;
+  const box = $('scrubTicks');
+  box.replaceChildren(...ticks.map((k, i) => {
+    const el = document.createElement('i');
+    const h = Math.min(11, 4 + Math.round(Math.sqrt((k.d?.added || 0) + (k.d?.removed || 0)) * 2));
+    el.style.left = `${k.x * 100}%`;
+    el.style.height = `${h}px`;
+    if (i < ticks.length - 1 && ticks[i + 1].boot !== k.boot) el.className = 'boot';
+    return el;
+  }));
+  $('scrubTrack').setAttribute('aria-valuemax', String(ticks.length - 1));
+  $('scrubTrack').setAttribute('aria-valuenow', String(ticks.length - 1));
+  placeNotch(1);
+}
+
+function placeNotch(x) {
+  notchX = Math.max(0, Math.min(1, x));
+  const w = $('scrubTrack').clientWidth - 16;
+  $('scrubNotch').style.transform = `translateX(${notchX * w}px)`;
+}
+
+function nearest(x) {
+  let best = ticks[ticks.length - 1];
+  for (const k of ticks) if (Math.abs(k.x - x) < Math.abs(best.x - x)) best = k;
+  return best;
+}
+
+let previewToken = 0;
+async function preview(k) {
+  if (!k || k === ticks[ticks.length - 1]) return showNow();
+  if (viewing?.id === k.id) return;
+  viewing = k;
+  const token = ++previewToken;
+  const snap = await db.get('snaps', k.id);
+  if (token !== previewToken || !snap) return;
+  $('state').classList.add('viewing');
+  $('stateTitle').textContent = `Saved ${timeOf(k.t)}`;
+  $('stateSub').textContent = `${ago(k.t)}. Let go to return to now; open the Library to restore it`;
+  $('scrubLabel').textContent = timeOf(k.t);
+  renderMap(snap.data, { animate: false });
+}
+
+function showNow() {
+  if (!viewing) return;
+  viewing = null;
+  previewToken++;
+  $('state').classList.remove('viewing');
+  $('scrubLabel').textContent = 'Now';
+  refresh(false);
+  renderMap(current?.data, { animate: false });
+}
+
+const timeOf = (t) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+(function scrubber() {
+  const track = $('scrubTrack');
+  let drag = null, spring = null;
+  const xOf = (e) => { const r = track.getBoundingClientRect(); return (e.clientX - r.left - 8) / (r.width - 16); };
+  track.addEventListener('pointerdown', (e) => {
+    spring?.stop();
+    track.setPointerCapture(e.pointerId);
+    drag = { hist: [[e.timeStamp, xOf(e)]] };
+    placeNotch(xOf(e));                // respond on press, not on release
+    preview(nearest(notchX));
+  });
+  track.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const x = xOf(e);
+    drag.hist.push([e.timeStamp, x]);
+    if (drag.hist.length > 5) drag.hist.shift();
+    placeNotch(x);                     // 1:1 with the pointer
+    preview(nearest(notchX));
+  });
+  const release = () => {
+    if (!drag) return;
+    const [a, b] = [drag.hist[0], drag.hist[drag.hist.length - 1]];
+    const v = b[0] > a[0] ? (b[1] - a[1]) / ((b[0] - a[0]) / 1000) : 0; // track widths per second
+    drag = null;
+    if (still) { placeNotch(1); return showNow(); }
+    // Back to now with the hand's velocity, a little bounce because a drag carried momentum.
+    spring = animate(notchX, 1, { type: 'spring', bounce: 0.15, duration: 0.45, velocity: v, onUpdate: placeNotch, onComplete: showNow });
+  };
+  track.addEventListener('pointerup', release);
+  track.addEventListener('pointercancel', release);
+  track.addEventListener('keydown', (e) => {
+    if (!ticks.length) return;
+    const i = ticks.indexOf(viewing || ticks[ticks.length - 1]);
+    const n = e.key === 'ArrowLeft' ? i - 1 : e.key === 'ArrowRight' ? i + 1 : e.key === 'End' || e.key === 'Escape' ? ticks.length - 1 : null;
+    if (n == null) return;
+    e.preventDefault();
+    const k = ticks[Math.max(0, Math.min(ticks.length - 1, n))];
+    track.setAttribute('aria-valuenow', String(ticks.indexOf(k)));
+    track.setAttribute('aria-valuetext', k === ticks[ticks.length - 1] ? 'Now' : timeOf(k.t));
+    placeNotch(k.x);
+    preview(k);
+  });
+  track.addEventListener('dblclick', () => { placeNotch(1); showNow(); });
+})();
 
 // ---------- sessions and the last session ----------
 
@@ -96,7 +244,8 @@ async function loadLists() {
   ul.replaceChildren(...sessions.map(sessionRow));
   $('noSessions').hidden = sessions.length > 0;
   current = snaps[0] ? await db.get('snaps', snaps[0].id) : null;
-  renderMap(current?.data);
+  if (!viewing) renderMap(current?.data);
+  renderScrubber([...snaps].reverse());
   // "Before Chrome last closed": the newest save from an earlier run of Chrome, shown while
   // some of its tabs are not open now (Chrome restored nothing, or the wrong windows).
   const { boot } = await send('status');
@@ -123,7 +272,7 @@ $('openLib').addEventListener('click', () => { chrome.runtime.openOptionsPage();
 $('saveSession').addEventListener('click', async () => {
   const r = await send('saveSession', {});
   if (r?.error) return toast(`Could not save: ${r.error}`);
-  toast('Session saved. It stays until you delete it.');
+  toast('Kept. It stays until you delete it.');
   loadLists();
 });
 
@@ -196,6 +345,7 @@ function highlight(el, text, words) {
 
 let qTimer;
 $('q').addEventListener('input', () => { clearTimeout(qTimer); qTimer = setTimeout(runSearch, 60); });
+document.addEventListener('keydown', (e) => { if (e.key === '/' && document.activeElement !== $('q')) { e.preventDefault(); $('q').focus(); } });
 $('q').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') $('results').querySelector('button.open')?.click();
   if (e.key === 'Escape' && $('q').value) { e.preventDefault(); $('q').value = ''; runSearch(); }

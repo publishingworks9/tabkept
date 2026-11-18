@@ -1,4 +1,5 @@
 import * as db from './lib/db.js';
+import { animate } from './vendor/motion.mjs';
 import { DEFAULTS, STALE_MS, BIG_RESTORE, TRASH_DAYS, counts, ago, plural, normUrl, backupJson } from './lib/core.js';
 import { parseImport } from './lib/import.js';
 import { APP } from './lib/app.js';
@@ -93,7 +94,7 @@ function favicon(url) {
 }
 
 // One expandable card. load() returns the payload when first opened.
-function item({ title, sub, acts = [], load, pick, selectable, onSelect, extra, onGroup }) {
+function item({ title, sub, acts = [], load, pick, selectable, onSelect, extra, onGroup, lead }) {
   const card = h('div', { class: 'item' });
   const body = h('div', { class: 'body' }, h('div'));
   let built = null;
@@ -114,11 +115,12 @@ function item({ title, sub, acts = [], load, pick, selectable, onSelect, extra, 
   };
   const head = h('div', { class: 'item-head' },
     selectable ? h('input', { type: 'checkbox', class: 'sel', 'aria-label': `Select ${title}`, onchange: (e) => onSelect?.(e.target.checked) }) : null,
-    h('button', { class: 'expand', 'aria-expanded': 'false', onclick: toggle }, CHEV(), h('span', { class: 'txt' }, h('b', { text: title }), h('span', { class: 'num' }, ...[].concat(sub)))),
+    h('button', { class: 'expand', 'aria-expanded': 'false', onclick: toggle }, CHEV(), h('span', { class: 'txt' }, lead || null, h('b', { text: title }), h('span', { class: 'num' }, ...[].concat(sub)))),
     h('div', { class: 'acts' }, ...acts.map((a) => h('button', { class: 'btn' + (a.primary ? ' primary' : '') + (a.danger ? ' danger' : ''), text: a.label, onclick: a.run }))),
   );
   card.append(head, body);
   if (extra) card.append(extra);
+  card.toggleOpen = toggle;
   return card;
 }
 
@@ -145,7 +147,9 @@ async function renderNow() {
     data.windows[0].groups = ids.map((id) => ({ title: gmap.get(id)?.title || '', color: gmap.get(id)?.color || 'grey', collapsed: gmap.get(id)?.collapsed }));
     for (const t of data.windows[0].tabs) if (t.g != null) t.g = ids.indexOf(t.g);
     const asleep = w.tabs.filter((t) => t.discarded).length;
+    const lead = h('span', { class: 'chipline', 'aria-hidden': 'true' }, ...w.tabs.slice(0, 40).map((t) => h('i', { class: t.pinned ? 'pin' : t.groupId > -1 ? `g-${gmap.get(t.groupId)?.color || 'grey'}` : null })));
     return item({
+      lead,
       title: name || `Window ${i + 1}${w.focused ? ' (this window)' : ''}`,
       sub: `${summary(counts(data))}${asleep ? ` · ${asleep} asleep` : ''}${w.incognito ? ' · incognito' : ''}`,
       acts: [
@@ -259,6 +263,7 @@ async function renderTimeline() {
   const snaps = await db.list('snaps', { light: true });
   const box = $('tlList');
   box.replaceChildren();
+  const cards = new Map();
   let day = '', boot = null, wrap = null;
   for (const s of snaps) {
     const d = new Date(s.t).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
@@ -266,7 +271,7 @@ async function renderTimeline() {
     if (boot != null && s.boot !== boot) wrap.append(h('div', { class: 'restart', text: 'Chrome started' }));
     boot = s.boot;
     const delta = h('span', { class: 'delta' }, s.d?.added ? h('span', { class: 'plus', text: ` +${s.d.added}` }) : null, s.d?.removed ? h('span', { class: 'minus', text: ` −${s.d.removed}` }) : null);
-    wrap.append(item({
+    wrap.append(cards.set(s.id, item({
       title: new Date(s.t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
       sub: [summary(s.c), delta],
       acts: [
@@ -276,9 +281,65 @@ async function renderTimeline() {
       load: async () => (await db.get('snaps', s.id)).data,
       onGroup: (data) => restore(data),
       pick: [{ label: 'Restore ticked', primary: true, run: (t) => restore(t.pickedData()) }],
-    }));
+    })).get(s.id));
   }
-  if (!snaps.length) box.append(h('p', { class: 'empty', text: 'Nothing saved yet.' }));
+  if (!snaps.length) return box.append(h('p', { class: 'empty', text: 'Nothing saved yet.' }));
+  if (snaps.length > 1) box.prepend(ribbon(snaps, cards));
+}
+
+// The big ribbon: every kept save across the whole timeline. Drag the notch; it lands on the save
+// nearest to where the drag was heading (apple-design §6 projection) and opens that save below.
+function ribbon(snaps, cards) {
+  const oldest = snaps[snaps.length - 1].t, newest = snaps[0].t, span = Math.max(1, newest - oldest);
+  const ticks = [...snaps].reverse().map((s) => ({ s, x: (s.t - oldest) / span }));
+  const tickEls = ticks.map((k) => h('i', { style: `left:${k.x * 100}%;height:${Math.min(26, 8 + Math.round(Math.sqrt((k.s.d?.added || 0) + (k.s.d?.removed || 0)) * 3))}px` }));
+  const notch = h('span', { class: 'notch', 'aria-hidden': 'true' });
+  const fmt = (t) => new Date(t).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+  const el = h('div', { class: 'ribbon', role: 'slider', tabindex: 0, 'aria-label': 'Move through the timeline', 'aria-valuemin': 0, 'aria-valuemax': ticks.length - 1, 'aria-valuenow': ticks.length - 1 },
+    h('div', { class: 'ticks' }, ...tickEls), notch, h('div', { class: 'ends' }, h('span', { text: fmt(oldest) }), h('span', { text: 'Now' })));
+  let x = 1, sel = null, spring = null, drag = null;
+  const width = () => el.querySelector('.ticks').clientWidth;
+  const place = (v) => { x = Math.max(0, Math.min(1, v)); notch.style.transform = `translateX(${x * width() - 6}px)`; };
+  const nearest = (v) => ticks.reduce((a, b) => (Math.abs(b.x - v) < Math.abs(a.x - v) ? b : a));
+  const select = (k) => {
+    if (sel === k) return;
+    tickEls[ticks.indexOf(sel)]?.classList.remove('sel');
+    sel = k;
+    tickEls[ticks.indexOf(k)].classList.add('sel');
+    el.setAttribute('aria-valuenow', ticks.indexOf(k));
+    el.setAttribute('aria-valuetext', fmt(k.s.t));
+  };
+  const land = async (k) => {
+    for (const c of cards.values()) c.classList.remove('hit');
+    const card = cards.get(k.s.id);
+    card.classList.add('hit');
+    card.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    if (!card.classList.contains('open')) await card.toggleOpen();
+  };
+  const xOf = (e) => { const r = el.querySelector('.ticks').getBoundingClientRect(); return (e.clientX - r.left) / r.width; };
+  el.addEventListener('pointerdown', (e) => { spring?.stop(); el.setPointerCapture(e.pointerId); drag = [[e.timeStamp, xOf(e)]]; place(xOf(e)); select(nearest(x)); });
+  el.addEventListener('pointermove', (e) => { if (!drag) return; drag.push([e.timeStamp, xOf(e)]); if (drag.length > 5) drag.shift(); place(xOf(e)); select(nearest(x)); });
+  const up = () => {
+    if (!drag) return;
+    const [a, b] = [drag[0], drag[drag.length - 1]];
+    const v = b[0] > a[0] ? (b[1] - a[1]) / ((b[0] - a[0]) / 1000) : 0;
+    drag = null;
+    const target = nearest(x + (v / 1000) * 0.99 / (1 - 0.99)); // project the throw, then snap
+    select(target);
+    spring = animate(x, target.x, { type: 'spring', bounce: Math.abs(v) > 0.2 ? 0.15 : 0, duration: 0.4, velocity: v, onUpdate: place });
+    land(target);
+  };
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+  el.addEventListener('keydown', (e) => {
+    const i = ticks.indexOf(sel || ticks[ticks.length - 1]);
+    const n = e.key === 'ArrowLeft' ? i - 1 : e.key === 'ArrowRight' ? i + 1 : null;
+    if (n == null || n < 0 || n >= ticks.length) return;
+    e.preventDefault();
+    select(ticks[n]); place(ticks[n].x); land(ticks[n]);
+  });
+  requestAnimationFrame(() => place(1));
+  return el;
 }
 
 // ---------- Bin ----------

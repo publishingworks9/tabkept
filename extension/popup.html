@@ -10,37 +10,48 @@
 <header class="top">
   <img class="mark" src="icons/32.png" alt="" width="20" height="20">
   <span class="name" data-app>Tabkept</span>
-  <button id="openLib" class="btn quiet" title="Every saved session, the timeline, the bin and settings">Library</button>
+  <button id="openLib" class="btn quiet" title="Every kept session, the timeline, the bin and settings">Library</button>
 </header>
 
 <section class="state" id="state" data-state="ok" aria-live="polite">
-  <div class="stamp">
+  <div class="status">
     <span class="seal" aria-hidden="true"><svg viewBox="0 0 20 20"><path class="tick" d="M5.5 10.4 8.6 13.4 14.6 6.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path class="bang" d="M10 5.5v5.4M10 14.3v.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span>
-    <div class="stamp-text">
+    <div class="status-text">
       <b id="stateTitle">Everything is saved</b>
       <span id="stateSub" class="num">Checking…</span>
     </div>
   </div>
   <button class="btn primary startbtn" id="startBtn" hidden>See what Tabkept saves and start</button>
-  <div class="map" id="map" aria-hidden="true"></div>
+  <!-- Moment 1: every window as an index card, the tabs as chips along its edge -->
+  <div class="stack" id="map" aria-hidden="true"></div>
   <p class="counts num" id="counts"></p>
+  <!-- Moment 2: the ribbon scrubber, every save of the last 24 hours -->
+  <div class="scrub" id="scrub" hidden>
+    <div class="scrub-track" id="scrubTrack" role="slider" tabindex="0" aria-label="Look back through the last 24 hours of saves" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
+      <span class="scrub-ticks" id="scrubTicks"></span>
+      <span class="scrub-notch notch" id="scrubNotch"></span>
+    </div>
+    <div class="scrub-meta num"><span>24 h ago</span><span id="scrubLabel">Now</span></div>
+  </div>
 </section>
 
 <div class="search">
   <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m13.2 13.2 3.3 3.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-  <input id="q" class="field" type="search" placeholder="Search open and saved tabs" aria-label="Search open and saved tabs" autocomplete="off">
+  <input id="q" class="field" type="search" placeholder="Search open and kept tabs" aria-label="Search open and kept tabs" autocomplete="off">
+  <kbd aria-hidden="true">/</kbd>
 </div>
 
 <div id="results" class="results" hidden></div>
 
 <div id="home">
   <div class="actions">
-    <button id="saveSession" class="btn">Save session</button>
-    <button id="sleepOthers" class="btn" title="Frees memory. The tabs stay where they are and load again when you click them.">Sleep other tabs</button>
+    <button id="saveSession" class="btn"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5h8v11l-4-3-4 3z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>Keep session</button>
+    <button id="sleepOthers" class="btn" title="Frees memory. The tabs stay where they are and load again when you click them."><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M12.5 9.5A5 5 0 0 1 6.5 3.5a5 5 0 1 0 6 6z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>Sleep others</button>
     <button id="dupes" class="btn" disabled>No duplicates</button>
   </div>
 
   <section id="prev" class="prev" hidden>
+    <span class="notch" aria-hidden="true"></span>
     <div>
       <b>Before Chrome last closed</b>
       <span id="prevSub" class="num"></span>
@@ -49,9 +60,9 @@
   </section>
 
   <section class="sessions">
-    <h2>Saved sessions</h2>
+    <h2>Kept sessions</h2>
     <ul id="sessions"></ul>
-    <p id="noSessions" class="empty" hidden>Sessions you save stay until you delete them. Automatic saves are in the Library timeline.</p>
+    <p id="noSessions" class="empty" hidden>Sessions you keep stay until you delete them. Every automatic save is in the Library timeline.</p>
   </section>
 </div>
 

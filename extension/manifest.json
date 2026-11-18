@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Tabkept: Session Saver & Tab Backup",
   "short_name": "Tabkept",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Saves every window, tab and tab group as you work, keeps backup files you own, and restores them. Nothing leaves your computer.",
   "minimum_chrome_version": "121",
   "icons": {

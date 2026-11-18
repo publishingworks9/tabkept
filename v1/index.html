@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en" data-type="software">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tabkept: every tab, saved as you work</title>
+<meta name="description" content="A Chrome extension that saves every window, tab and tab group as you work, keeps hourly backup files in your Downloads folder, and restores them with their groups. No account, nothing leaves your computer.">
+<meta property="og:title" content="Tabkept">
+<meta property="og:description" content="Every tab, saved as you work. Backup files you own.">
+<meta property="og:image" content="https://publishingworks9.github.io/tabkept/og.png">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icon-128.png">
+<!-- No web fonts, no analytics, no third-party requests. Without script, or with reduced motion, every demo shows its finished state. -->
+<style>
+:root {
+  color-scheme: light dark;
+  --paper: #F6F4EE; --sheet: #FFFFFF; --ink: #1C1A17; --ink-2: #5E584E; --ink-3: #736C61; --rule: #E4DFD4; --rule-2: #D3CCBE;
+  --accent: #2446C7; --accent-ink: #FFFFFF; --accent-soft: #E7ECFB; --mark: #3A60F0; --ok: #2F7D4F; --warn: #B4400C;
+  --g-blue: #1A73E8; --g-orange: #E8710A; --g-green: #188038; --g-pink: #D01884; --g-purple: #9334E6; --g-grey: #5F6368;
+  --serif: ui-serif, "New York", "Iowan Old Style", Charter, Georgia, serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --spring: linear(0, .13 4%, .44 12%, .73 21%, .9 31%, .97 41%, 1 55%, 1);
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --shadow: 0 1px 0 rgba(28,26,23,.04), 0 1px 3px rgba(28,26,23,.06);
+  --lift: 0 30px 70px -24px rgba(60,45,20,.28), 0 2px 6px rgba(28,26,23,.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #161513; --sheet: #201E1B; --ink: #EEEAE1; --ink-2: #ABA497; --ink-3: #938D81; --rule: #2E2B27; --rule-2: #3B3833;
+    --accent: #93A8FF; --accent-ink: #10142B; --accent-soft: #232A45; --ok: #74C795; --warn: #F3955F;
+    --g-blue: #8AB4F8; --g-orange: #FCAD70; --g-green: #81C995; --g-pink: #FF8BCB; --g-purple: #D7AEFB; --g-grey: #BDC1C6;
+    --shadow: 0 1px 0 rgba(0,0,0,.3); --lift: 0 30px 70px -24px rgba(0,0,0,.7), 0 2px 6px rgba(0,0,0,.4);
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 17px/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
+::selection { background: color-mix(in srgb, var(--mark) 25%, transparent); }
+a { color: inherit; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); }
+a:hover { text-decoration-color: currentColor; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 32px; }
+.num { font-variant-numeric: tabular-nums; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 600; letter-spacing: -.02em; margin: 0; text-wrap: balance; }
+p { text-wrap: pretty; }
+
+/* nav */
+.nav { display: flex; align-items: center; justify-content: space-between; height: 76px; }
+.brand { display: flex; align-items: center; gap: 10px; font: 600 20px/1 var(--serif); text-decoration: none; }
+.brand svg { width: 28px; height: 28px; color: var(--mark); }
+.nav-links { display: flex; gap: 26px; font-size: 15px; color: var(--ink-2); }
+.nav-links a { text-decoration: none; }
+.nav-links a:hover { color: var(--ink); }
+
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 20px; border-radius: 10px; font-weight: 600; font-size: 16px; text-decoration: none; border: 1px solid var(--rule-2); background: var(--sheet); color: var(--ink); transition: transform .16s var(--ease), border-color .16s; }
+.btn:hover { border-color: var(--ink-3); }
+.btn:active { transform: scale(.97); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.state-pill { display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 16px; border-radius: 10px; font-size: 15px; color: var(--ink-2); background: color-mix(in srgb, var(--rule) 60%, transparent); }
+.state-pill i { width: 8px; height: 8px; border-radius: 50%; background: #C68A12; }
+
+/* hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 56px; align-items: center; min-height: calc(100svh - 76px); padding: 24px 0 72px; }
+.hero h1 { font-size: clamp(44px, 6vw, 76px); line-height: 1.02; }
+.hero .lede { font-size: 20px; color: var(--ink-2); margin: 24px 0 34px; max-width: 34ch; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.fine { margin-top: 18px; font-size: 14px; color: var(--ink-3); }
+
+/* the popup replica */
+.pop { width: min(372px, 100%); justify-self: center; background: var(--paper); border-radius: 14px; box-shadow: var(--lift); outline: 1px solid color-mix(in srgb, var(--ink) 7%, transparent); padding-bottom: 10px; font-size: 13px; }
+.pop-top { display: flex; align-items: center; gap: 8px; padding: 12px 14px 10px 16px; }
+.pop-top svg { width: 20px; height: 20px; color: var(--mark); }
+.pop-top b { font: 600 15px/1 var(--serif); }
+.pop-top span { margin-left: auto; color: var(--ink-2); font-weight: 600; font-size: 13px; }
+.record { margin: 0 12px; padding: 14px 14px 12px; border-radius: 10px; background: var(--sheet); border: 1px solid var(--rule); box-shadow: var(--shadow); }
+.stamp { display: flex; align-items: center; gap: 11px; }
+.seal { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, transparent); flex: none; }
+.seal svg { width: 18px; height: 18px; }
+.seal.beat { animation: beat .7s var(--spring); }
+@keyframes beat { 0% { transform: scale(.8); } 100% { transform: scale(1); } }
+.stamp b { display: block; font: 600 15px/1.25 var(--serif); }
+.stamp small { color: var(--ink-2); font-size: 12px; }
+.map { display: grid; gap: 4px; margin-top: 12px; }
+.map .w { display: flex; gap: 2px; height: 8px; }
+.map .t { flex: 0 0 14px; border-radius: 2px; background: var(--rule-2); transform-origin: left; }
+.map .t.new { animation: grow .5s var(--spring); }
+@keyframes grow { from { transform: scaleX(0); opacity: 0; } }
+.map .t.g-blue { background: var(--g-blue); } .map .t.g-orange { background: var(--g-orange); } .map .t.g-green { background: var(--g-green); }
+.counts { margin: 10px 0 0; color: var(--ink-2); font-size: 12px; }
+.pop .search { margin: 12px 12px 0; height: 34px; border-radius: 7px; border: 1px solid var(--rule-2); background: var(--sheet); display: flex; align-items: center; padding: 0 10px; gap: 8px; color: var(--ink-3); }
+.pop .search svg { width: 15px; height: 15px; }
+.pop .acts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 12px 0; }
+.pop .acts span { height: 32px; border-radius: 7px; border: 1px solid var(--rule-2); background: var(--sheet); display: grid; place-items: center; font-weight: 600; font-size: 12px; }
+.pop .acts span.off { opacity: .45; }
+.pop .list { margin: 14px 12px 0; }
+.pop .list small { display: block; margin: 0 4px 4px; font-weight: 600; font-size: 11px; color: var(--ink-2); }
+.pop .row { padding: 6px 4px 6px 6px; }
+.pop .row b { display: block; font-weight: 600; }
+.pop .row span { color: var(--ink-2); font-size: 12px; }
+.pop .foot { margin-top: 10px; padding: 10px 14px 2px 16px; border-top: 1px solid var(--rule); color: var(--ink-2); font-size: 12px; }
+
+/* sections */
+section.band { padding: 112px 0; border-top: 1px solid var(--rule); }
+.split { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 72px; align-items: center; }
+.split.flip > :first-child { order: 2; }
+.eyebrow { font: 600 13px/1 var(--sans); color: var(--ink-3); margin: 0 0 18px; }
+.band h2 { font-size: clamp(34px, 4.2vw, 52px); line-height: 1.06; }
+.band .copy p { color: var(--ink-2); font-size: 18px; margin: 20px 0 0; max-width: 40ch; }
+
+/* crash story */
+.story { background: var(--sheet); border: 1px solid var(--rule); border-radius: 16px; box-shadow: var(--shadow); padding: 22px; }
+.steps { display: flex; gap: 6px; margin-bottom: 18px; }
+.steps button { all: unset; cursor: pointer; flex: 1; padding: 10px 12px; border-radius: 8px; font-size: 14px; font-weight: 600; color: var(--ink-2); background: color-mix(in srgb, var(--rule) 55%, transparent); position: relative; overflow: hidden; }
+.steps button[aria-selected="true"] { color: var(--ink); background: var(--accent-soft); }
+.steps button .bar { position: absolute; left: 0; bottom: 0; height: 2px; width: 0; background: var(--accent); }
+.steps button[aria-selected="true"] .bar { animation: fill var(--step, 3.2s) linear forwards; }
+.paused .steps button .bar { animation-play-state: paused; }
+@keyframes fill { to { width: 100%; } }
+.steps button:focus-visible { outline: 2px solid var(--accent); }
+.stage { position: relative; height: 270px; border-radius: 10px; background: var(--paper); border: 1px solid var(--rule); overflow: hidden; }
+.chrome { position: absolute; inset: 14px 14px auto 14px; height: 30px; display: flex; gap: 4px; align-items: flex-end; }
+.chrome .tab { height: 24px; flex: 0 1 92px; border-radius: 7px 7px 0 0; background: var(--sheet); border: 1px solid var(--rule); border-bottom: 0; transition: opacity .35s, transform .45s var(--spring); }
+.chrome .tab.g1 { box-shadow: inset 0 3px 0 var(--g-blue); } .chrome .tab.g2 { box-shadow: inset 0 3px 0 var(--g-orange); }
+.page { position: absolute; inset: 44px 14px 14px 14px; border-radius: 0 8px 8px 8px; background: var(--sheet); border: 1px solid var(--rule); }
+.page i { display: block; height: 9px; margin: 16px 18px 0; border-radius: 4px; background: var(--rule); }
+.page i:nth-child(2) { width: 70%; } .page i:nth-child(3) { width: 82%; } .page i:nth-child(4) { width: 46%; }
+.stage .note { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; font-size: 15px; color: var(--ink-2); opacity: 0; transition: opacity .3s; width: 80%; }
+.stage .card { position: absolute; right: 26px; bottom: 26px; width: 290px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 12px 12px 14px; border-radius: 10px; background: var(--accent-soft); box-shadow: var(--lift); opacity: 0; transform: translateY(14px); transition: opacity .3s, transform .45s var(--spring); font-size: 13px; }
+.stage .card b { display: block; font-weight: 600; }
+.stage .card span { color: var(--ink-2); font-size: 12px; }
+.stage .card em { font-style: normal; height: 30px; padding: 0 12px; border-radius: 7px; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.story[data-step="1"] .tab { opacity: 0; transform: translateY(8px); }
+.story[data-step="1"] .page i { opacity: 0; }
+.story[data-step="1"] .note.n1 { opacity: 1; }
+.story[data-step="2"] .tab { opacity: 0; transform: translateY(8px); }
+.story[data-step="2"] .page i { opacity: 0; }
+.story[data-step="2"] .card { opacity: 1; transform: none; }
+.story[data-step="3"] .tab { transition-delay: calc(var(--i) * 60ms); }
+.cap { margin: 14px 2px 0; font-size: 14px; color: var(--ink-2); min-height: 2.8em; }
+
+/* backup folder */
+.folder { background: var(--sheet); border: 1px solid var(--rule); border-radius: 14px; box-shadow: var(--lift); overflow: hidden; font-size: 14px; }
+.folder-top { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--rule); color: var(--ink-2); font-weight: 600; font-size: 13px; }
+.folder-top i { width: 10px; height: 10px; border-radius: 50%; background: var(--rule-2); }
+.folder-top span { margin-left: 8px; }
+.files { list-style: none; margin: 0; padding: 6px 0; }
+.files li { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; padding: 8px 16px; font-family: var(--mono); font-size: 13px; }
+.files li:nth-child(odd) { background: color-mix(in srgb, var(--rule) 30%, transparent); }
+.files li svg { width: 16px; height: 18px; color: var(--ink-3); }
+.files li small { font-family: var(--sans); color: var(--ink-3); font-size: 12px; }
+.files li.html svg { color: var(--mark); }
+.files li.fresh { animation: drop .6s var(--spring); }
+@keyframes drop { from { opacity: 0; transform: translateY(-10px); } }
+
+/* groups */
+.strip { background: var(--sheet); border: 1px solid var(--rule); border-radius: 14px; box-shadow: var(--shadow); padding: 18px; }
+.strip-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 8px; color: #fff; font-weight: 600; font-size: 13px; }
+.chip.blue { background: var(--g-blue); } .chip.orange { background: var(--g-orange); } .chip.green { background: var(--g-green); }
+@media (prefers-color-scheme: dark) { .chip { color: #161513; } }
+.mini { height: 28px; width: 76px; border-radius: 7px; background: var(--paper); border: 1px solid var(--rule); border-top: 3px solid var(--c); transition: width .5s var(--spring), opacity .3s, margin .5s var(--spring); }
+.strip.collapsed .mini.c2 { width: 0; opacity: 0; margin: 0 -3px; border-width: 0; }
+.strip-note { margin: 16px 2px 0; font-size: 14px; color: var(--ink-2); }
+
+/* promises */
+.ledger { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule-2); }
+.ledger li { display: grid; grid-template-columns: 1fr auto; gap: 24px; padding: 18px 0; border-bottom: 1px solid var(--rule); font-size: 18px; }
+.ledger li span { color: var(--ink-3); font-size: 15px; }
+.promises h2 { max-width: 14ch; }
+
+/* open source and support */
+.open { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 56px; align-items: start; }
+.open .acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+.faq details { border-bottom: 1px solid var(--rule); padding: 16px 0; }
+.faq summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
+.faq summary::after { content: "+"; color: var(--ink-3); font-weight: 400; transition: transform .25s var(--spring); }
+.faq details[open] summary::after { transform: rotate(45deg); }
+.faq summary::-webkit-details-marker { display: none; }
+.faq p { margin: 10px 0 0; color: var(--ink-2); font-size: 16px; }
+
+footer { padding: 48px 0 64px; border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 14px; }
+footer .wrap { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+
+@media (max-width: 900px) {
+  .hero, .split, .open { grid-template-columns: minmax(0, 1fr); gap: 44px; }
+  .split.flip > :first-child { order: 0; }
+  .hero { min-height: 0; padding-top: 12px; }
+  section.band { padding: 80px 0; }
+  .nav-links { display: none; }
+}
+@media (max-width: 520px) {
+  .wrap { padding: 0 20px; }
+  .hero h1 { font-size: 42px; }
+  .stage { height: 240px; }
+  .stage .card { left: 16px; right: 16px; width: auto; bottom: 16px; }
+  .steps button { font-size: 13px; padding: 9px 8px; }
+  .ledger li { grid-template-columns: 1fr; gap: 2px; font-size: 17px; }
+  .files li { font-size: 12px; padding: 8px 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0s !important; transition-duration: 0s !important; }
+  html { scroll-behavior: auto; }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="mark" viewBox="0 0 256 256"><path fill-rule="evenodd" fill="currentColor" d="M20 204 C38 204 46 196 46 178 V92 a30 30 0 0 1 30 -30 H180 a30 30 0 0 1 30 30 V178 c0 18 8 26 26 26 Z M136 62 V138 L156 122 L176 138 V62 Z"/></symbol>
+<symbol id="tick" viewBox="0 0 20 20"><path d="M5.5 10.4 8.6 13.4 14.6 6.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="file" viewBox="0 0 16 18"><path d="M2.5 1.5h7l4 4v11h-11z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M9.5 1.5v4h4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol></svg>
+
+<header class="wrap nav">
+  <a class="brand" href="./" aria-label="Tabkept home"><svg aria-hidden="true"><use href="#mark"/></svg>Tabkept</a>
+  <nav class="nav-links" aria-label="Main"><a href="#restore">Restore</a><a href="#backups">Backups</a><a href="#promises">Promises</a><a href="#questions">Questions</a><a href="../privacy.html">Privacy</a></nav>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <div>
+      <h1>Every tab, saved as you work.</h1>
+      <p class="lede">Tabkept keeps a copy of every window, tab and tab group, writes an hourly backup file you own, and brings them back when Chrome doesn't.</p>
+      <div class="cta">
+        <span class="state-pill" id="storeState"><i></i>In review at the Chrome Web Store</span>
+        <a class="btn" href="#restore">See how restoring works</a>
+      </div>
+      <p class="fine">Free. No account. Nothing leaves your computer.</p>
+    </div>
+    <div class="pop" aria-label="The Tabkept popup, saving as tabs open" role="img">
+      <div class="pop-top"><svg aria-hidden="true"><use href="#mark"/></svg><b>Tabkept</b><span>Library</span></div>
+      <div class="record">
+        <div class="stamp"><span class="seal" id="seal"><svg aria-hidden="true"><use href="#tick"/></svg></span><div><b>Everything is saved</b><small id="saved" class="num">Last change saved just now</small></div></div>
+        <div class="map" id="map"></div>
+        <p class="counts num" id="counts">3 windows · 14 tabs · 2 groups</p>
+      </div>
+      <div class="search"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m13.2 13.2 3.3 3.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Search open and saved tabs</div>
+      <div class="acts"><span>Save session</span><span>Sleep other tabs</span><span class="off">No duplicates</span></div>
+      <div class="list"><small>Saved sessions</small>
+        <div class="row"><b>Q3 launch</b><span class="num">5 tabs · 1 group · yesterday</span></div>
+        <div class="row"><b>Lisbon trip</b><span class="num">4 tabs · 1 group · 3 days ago</span></div>
+      </div>
+      <div class="foot num">Backup file saved 14 min ago</div>
+    </div>
+  </div>
+
+  <section class="band" id="restore">
+    <div class="wrap split">
+      <div class="copy">
+        <p class="eyebrow">When Chrome restores nothing</p>
+        <h2>The session from before is one click away.</h2>
+        <p>A crash, a forced update, the wrong profile, a window closed by accident. Tabkept keeps the last session from before Chrome restarted and offers it in the popup while its tabs aren't open.</p>
+        <p>Restored tabs open asleep and load when you click them, so getting back 400 tabs doesn't freeze the computer.</p>
+      </div>
+      <div class="story" id="story" data-step="3">
+        <div class="steps" role="tablist" aria-label="What happens after a crash">
+          <button role="tab" aria-selected="false" data-s="1"><span>1. Chrome restarts</span><span class="bar"></span></button>
+          <button role="tab" aria-selected="false" data-s="2"><span>2. Tabkept offers</span><span class="bar"></span></button>
+          <button role="tab" aria-selected="true" data-s="3"><span>3. Back as it was</span><span class="bar"></span></button>
+        </div>
+        <div class="stage" aria-hidden="true">
+          <div class="chrome"><span class="tab g1" style="--i:0"></span><span class="tab g1" style="--i:1"></span><span class="tab g1" style="--i:2"></span><span class="tab g2" style="--i:3"></span><span class="tab g2" style="--i:4"></span><span class="tab" style="--i:5"></span></div>
+          <div class="page"><i></i><i></i><i></i><i></i></div>
+          <p class="note n1">A new, empty window.<br>Yesterday's 47 tabs are nowhere.</p>
+          <div class="card"><div><b>Before Chrome last closed</b><span class="num">47 tabs in 3 windows · 47 not open now</span></div><em>Restore</em></div>
+        </div>
+        <p class="cap" id="cap" aria-live="polite">The windows come back with their tab groups, names and colours. Tabs you click load; the rest wait asleep.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="backups">
+    <div class="wrap split flip">
+      <div class="copy">
+        <p class="eyebrow">Backup files</p>
+        <h2>Files that are yours, not the extension's.</h2>
+        <p>Once an hour Tabkept writes a file to Downloads/Tabkept, with a page of links that opens in any browser. A reset Chrome, a reinstall or a new laptop costs nothing: the welcome page restores from the file.</p>
+        <p>Before every update, an extra file is written first.</p>
+      </div>
+      <div class="folder" aria-label="The Downloads/Tabkept folder" role="img">
+        <div class="folder-top"><i></i><i></i><i></i><span>Downloads › Tabkept</span></div>
+        <ul class="files" id="files">
+          <li class="html"><svg aria-hidden="true"><use href="#file"/></svg>Open me - latest tabs.html<small>updated hourly</small></li>
+          <li><svg aria-hidden="true"><use href="#file"/></svg>2026-11-18 14.00.json<small>48 KB</small></li>
+          <li><svg aria-hidden="true"><use href="#file"/></svg>2026-11-18 13.00.json<small>47 KB</small></li>
+          <li><svg aria-hidden="true"><use href="#file"/></svg>2026-11-18 12.00.json<small>47 KB</small></li>
+          <li><svg aria-hidden="true"><use href="#file"/></svg>2026-11-18 11.00.json<small>45 KB</small></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="groups">
+    <div class="wrap split">
+      <div class="copy">
+        <p class="eyebrow">Tab groups</p>
+        <h2>Groups come back as you left them.</h2>
+        <p>Names, colours, order and whether a group was collapsed are saved with every change. Restoring next to a group that's already open adds to it instead of making a second one.</p>
+      </div>
+      <div class="strip" id="strip">
+        <div class="strip-row">
+          <span class="chip blue">Q3 launch</span><span class="mini" style="--c:var(--g-blue)"></span><span class="mini" style="--c:var(--g-blue)"></span><span class="mini" style="--c:var(--g-blue)"></span>
+          <span class="chip orange">Lisbon</span><span class="mini c2" style="--c:var(--g-orange)"></span><span class="mini c2" style="--c:var(--g-orange)"></span>
+          <span class="mini" style="--c:var(--rule-2)"></span>
+        </div>
+        <p class="strip-note" id="stripNote">"Lisbon" was collapsed when it was saved, so it comes back collapsed.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band promises" id="promises">
+    <div class="wrap split">
+      <div class="copy">
+        <p class="eyebrow">Promises</p>
+        <h2>What Tabkept will not do.</h2>
+        <p>These are the reasons people give for leaving other tab tools. Each one is a rule in the code, checked by its tests.</p>
+      </div>
+      <ul class="ledger">
+        <li>Ask you to sign up<span>There is no account</span></li>
+        <li>Send your tabs anywhere<span>No server, no analytics, no network requests</span></li>
+        <li>Take over your new-tab page<span>Or pin a helper tab, or rename your tabs</span></li>
+        <li>Close a tab without a way back<span>Everything it closes goes to a 30-day bin</span></li>
+        <li>Nag you<span>No donation screens, rating prompts or promotions</span></li>
+        <li>Take away what is free<span>Everything free today stays free</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="band" id="questions">
+    <div class="wrap open">
+      <div>
+        <p class="eyebrow">Open source</p>
+        <h2 style="font-size:clamp(34px,4.2vw,52px);line-height:1.06">Read every line it runs.</h2>
+        <p style="color:var(--ink-2);font-size:18px;margin:20px 0 0;max-width:40ch">Tabkept's code is public, so anyone can check that it does what this page says. If it has saved your tabs, you can support its development. Nothing changes either way.</p>
+        <div class="acts" id="supportActs">
+          <a class="btn" id="srcLink" href="https://github.com/publishingworks9/tabkept">Source code on GitHub</a>
+          <a class="btn" id="sponsorLink" hidden>Sponsor on GitHub</a>
+          <a class="btn" id="tipLink" hidden>Leave a tip</a>
+        </div>
+      </div>
+      <div class="faq">
+        <details><summary>Why does Chrome say it can "read your browsing history"?</summary><p>Tabkept needs the address and title of each open tab to save and restore it, and that is what this warning covers. The information stays in this browser and in the backup files on your computer. Tabkept does not read what is on pages.</p></details>
+        <details><summary>What does a sleeping tab do?</summary><p>It keeps its address, title and icon in the tab strip and frees the memory it used. It loads again when you click it. Tabkept uses Chrome's own tab sleeping, so nothing breaks if Tabkept is turned off or removed.</p></details>
+        <details><summary>Where are my saves kept?</summary><p>In this browser's storage, and once an hour in a file in Downloads/Tabkept. Removing Tabkept deletes the saves inside the browser; the files in Downloads stay until you delete them.</p></details>
+        <details><summary>Can it bring back a tab's back and forward history?</summary><p>No. Chrome doesn't let extensions restore that history, so a restored tab starts at the page it was on.</p></details>
+        <details><summary>Does it save incognito windows?</summary><p>Not unless you turn that on in Settings and allow Tabkept in Incognito. Private windows are only ever restored as private windows.</p></details>
+        <details><summary>Can I bring my saved tabs from another tool?</summary><p>Yes. Tabkept imports exported session files (JSON), CSV files, saved lists of links, Chrome bookmark files and its own backups. It can also send tabs left behind by a removed tab-sleeping extension back to their real pages.</p></details>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap"><span>Tabkept for Chrome</span><span><a href="../privacy.html">Privacy policy</a> · <a href="https://github.com/publishingworks9/tabkept">Source</a></span></div>
+</footer>
+
+<script>
+// Links that appear once they exist. Empty means hidden.
+const SUPPORT = { sponsor: '', tip: '' };
+for (const [id, url] of [['sponsorLink', SUPPORT.sponsor], ['tipLink', SUPPORT.tip]]) {
+  const a = document.getElementById(id);
+  if (url) { a.href = url; a.hidden = false; }
+}
+
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Hero: tabs open in the map and the seal confirms each save.
+(function hero() {
+  const map = document.getElementById('map'), seal = document.getElementById('seal'), counts = document.getElementById('counts'), saved = document.getElementById('saved');
+  const windows = [['blue', 'blue', 'blue', '', ''], ['orange', 'orange', '', ''], ['', '', '', '', '']];
+  const rows = windows.map((w) => { const r = document.createElement('div'); r.className = 'w'; map.append(r); return r; });
+  const add = (wi, g, fresh) => { const t = document.createElement('span'); t.className = 't' + (g ? ' g-' + g : '') + (fresh ? ' new' : ''); rows[wi].append(t); };
+  const total = () => map.querySelectorAll('.t').length;
+  windows.forEach((w, wi) => w.forEach((g) => add(wi, g)));
+  counts.textContent = `3 windows · ${total()} tabs · 2 groups`;
+  if (still) return;
+  const extra = [[2, ''], [0, 'blue'], [1, 'orange'], [2, 'green'], [2, 'green'], [0, '']];
+  let i = 0, since = 0;
+  setInterval(() => {
+    if (document.hidden) return;
+    since++;
+    if (since < 3) { saved.textContent = since === 1 ? 'Last change saved just now' : 'Last change saved 4 s ago'; return; }
+    since = 0;
+    if (i >= extra.length) { rows.forEach((r, wi) => { while (r.children.length > windows[wi].length) r.lastChild.remove(); }); i = 0; }
+    const [wi, g] = extra[i++];
+    add(wi, g, true);
+    counts.textContent = `3 windows · ${total()} tabs · ${map.querySelector('.g-green') ? 3 : 2} groups`;
+    seal.classList.remove('beat'); void seal.offsetWidth; seal.classList.add('beat');
+    saved.textContent = 'Last change saved just now';
+  }, 1400);
+})();
+
+// Crash story: three steps, auto-advancing while visible, keyboard and click to choose.
+(function story() {
+  const el = document.getElementById('story'), cap = document.getElementById('cap');
+  const caps = {
+    1: 'Chrome opens a new, empty window. Its own "restore pages" offer is gone, or brings back the wrong windows.',
+    2: 'Tabkept still has the session from before the restart, and offers it while those tabs are not open.',
+    3: 'The windows come back with their tab groups, names and colours. Tabs you click load; the rest wait asleep.',
+  };
+  const tabs = [...el.querySelectorAll('[role="tab"]')];
+  let step = 3, timer = null, visible = false, held = false;
+  const show = (s) => {
+    step = s;
+    el.dataset.step = s;
+    cap.textContent = caps[s];
+    tabs.forEach((t) => { t.setAttribute('aria-selected', String(+t.dataset.s === s)); t.tabIndex = +t.dataset.s === s ? 0 : -1; });
+    clearTimeout(timer);
+    if (!still && visible && !held) timer = setTimeout(() => show(s % 3 + 1), 3200);
+  };
+  tabs.forEach((t) => {
+    t.addEventListener('click', () => { held = true; el.classList.add('paused'); show(+t.dataset.s); });
+    t.addEventListener('keydown', (e) => {
+      const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if (!d) return;
+      held = true; el.classList.add('paused');
+      const s = (step - 1 + d + 3) % 3 + 1; show(s); tabs[s - 1].focus();
+    });
+  });
+  if (still) return show(3);
+  new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible && !held) show(1); else clearTimeout(timer); }, { threshold: .5 }).observe(el);
+})();
+
+// Backup folder: a new hourly file arrives when the folder comes into view.
+(function files() {
+  if (still) return;
+  const list = document.getElementById('files');
+  let done = false;
+  new IntersectionObserver(([e]) => {
+    if (!e.isIntersecting || done) return;
+    done = true;
+    setTimeout(() => {
+      const li = document.createElement('li');
+      li.className = 'fresh';
+      li.innerHTML = '<svg aria-hidden="true"><use href="#file"/></svg>2026-11-18 15.00.json<small>48 KB</small>';
+      list.children[0].after(li);
+      list.lastElementChild.remove();
+    }, 700);
+  }, { threshold: .6 }).observe(list);
+})();
+
+// Groups: the collapsed group folds when the strip comes into view.
+(function groups() {
+  const strip = document.getElementById('strip');
+  if (still) return strip.classList.add('collapsed');
+  new IntersectionObserver(([e]) => { if (e.isIntersecting) setTimeout(() => strip.classList.add('collapsed'), 600); }, { threshold: .6 }).observe(strip);
+})();
+</script>
+</body>
+</html>

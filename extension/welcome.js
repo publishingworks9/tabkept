@@ -1,4 +1,5 @@
 import * as db from './lib/db.js';
+import { animate } from './vendor/motion.mjs';
 import { DEFAULTS, counts, plural } from './lib/core.js';
 import { parseImport } from './lib/import.js';
 
@@ -28,3 +29,9 @@ $('file').addEventListener('change', async (e) => {
     $('impMsg').textContent = err.message;
   }
 });
+
+// One entrance: the three cards settle in from a fanned stack (critically damped, once).
+if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  const cards = [...document.querySelectorAll('dl > div')];
+  cards.forEach((c, i) => animate(c, { opacity: [0, 1], y: [14, 0], rotate: [[-1.5, 1, -1, 1.5][i] || 0, 0] }, { type: 'spring', bounce: 0, duration: 0.5, delay: i * 0.06 }));
+}
