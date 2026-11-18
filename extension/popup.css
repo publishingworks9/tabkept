@@ -1,0 +1,69 @@
+body { width: 372px; max-height: 590px; overflow: hidden auto; }
+
+.top { display: flex; align-items: center; gap: 8px; padding: 12px 12px 10px 16px; }
+.mark { width: 20px; height: 20px; }
+.name { font: 600 15px/1 var(--serif); letter-spacing: -.01em; }
+.top .btn { margin-left: auto; height: 28px; }
+
+/* The record: a stamp saying what is saved, and a small map of every window */
+.state { margin: 0 12px; padding: 14px 14px 12px; border-radius: var(--r); background: var(--sheet); box-shadow: var(--shadow); border: 1px solid var(--rule); }
+.stamp { display: flex; align-items: center; gap: 11px; }
+.seal { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; flex: none; color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, transparent); }
+.seal svg { width: 18px; height: 18px; }
+.stamp-text { display: grid; gap: 1px; min-width: 0; }
+.stamp-text b { font: 600 15px/1.25 var(--serif); }
+.stamp-text span { color: var(--ink-2); font-size: 12px; }
+.state[data-state="warn"] .seal { color: var(--warn); background: var(--warn-soft); }
+.seal .bang, .state[data-state="warn"] .seal .tick { display: none; }
+.state[data-state="warn"] .seal .bang { display: inline; }
+.state.pulse .seal { animation: seal .7s var(--spring); }
+@keyframes seal { 0% { transform: scale(.82); } 100% { transform: scale(1); } }
+
+.map { display: grid; gap: 4px; margin: 12px 0 0; }
+.map .w { display: flex; gap: 2px; height: 8px; }
+.map .t { flex: 1 1 0; min-width: 2px; max-width: 14px; border-radius: 2px; background: var(--rule-2); }
+.map .t[class*="g-"] { background: var(--g); opacity: .85; }
+.map .t.pin { flex: 0 0 5px; background: var(--ink-3); }
+.map .t.on { outline: 1.5px solid var(--ink); outline-offset: 1px; }
+.map .more { flex: none; font-size: 10px; line-height: 8px; color: var(--ink-3); padding-left: 3px; }
+.counts { margin: 10px 0 0; color: var(--ink-2); font-size: 12px; }
+
+.search { position: relative; margin: 12px 12px 0; }
+.search svg { position: absolute; left: 10px; top: 9px; width: 16px; height: 16px; color: var(--ink-3); pointer-events: none; }
+.search .field { padding-left: 32px; }
+
+.actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin: 10px 12px 0; }
+.actions .btn { padding: 0 6px; font-size: 12px; }
+
+.prev { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 12px 0; padding: 11px 12px 11px 14px; border-radius: var(--r); background: var(--accent-soft); }
+.prev div { display: grid; gap: 1px; min-width: 0; }
+.prev b { font-weight: 600; }
+.prev span { color: var(--ink-2); font-size: 12px; }
+
+.sessions { margin: 14px 12px 0; }
+.sessions h2, .results h2 { margin: 0 4px 4px; font: 600 11px/1.3 var(--sans); color: var(--ink-2); letter-spacing: .02em; }
+.sessions ul, .results ul { list-style: none; margin: 0; padding: 0; }
+.row { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 4px 6px 6px; border-radius: var(--r-s); }
+.row:hover { background: var(--rule); }
+.row .txt { display: grid; min-width: 0; flex: 1; }
+.row .txt b, .row .txt span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .txt b { font-weight: 550; }
+.row .txt span { color: var(--ink-2); font-size: 12px; }
+.row .btn { height: 28px; opacity: 0; transition: opacity .12s; }
+.row:hover .btn, .row:focus-within .btn { opacity: 1; }
+.row .chips { display: flex; gap: 3px; flex: none; }
+.row button.open { all: unset; display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; cursor: pointer; border-radius: 6px; }
+.row button.open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tag { font-size: 11px; color: var(--ink-3); flex: none; }
+.empty { margin: 4px 4px 0; color: var(--ink-2); font-size: 12px; }
+
+.results { margin: 10px 12px 0; max-height: 380px; overflow: auto; }
+.results .none { margin: 8px 4px; color: var(--ink-2); }
+mark { background: color-mix(in srgb, var(--accent) 22%, transparent); color: inherit; border-radius: 2px; }
+
+.foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 14px 0 0; padding: 8px 12px 10px 16px; border-top: 1px solid var(--rule); color: var(--ink-2); font-size: 12px; min-height: 42px; }
+.foot .btn { height: 26px; font-size: 12px; }
+.foot .warn { color: var(--warn); }
+.startbtn { width: 100%; margin-top: 12px; }
+.state[data-state="off"] .seal { color: var(--ink-3); background: var(--rule); }
+.state[data-state="off"] .seal .tick { display: none; }

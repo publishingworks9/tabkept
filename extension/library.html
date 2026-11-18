@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tabkept Library</title>
+<link rel="icon" href="icons/32.png">
+<link rel="stylesheet" href="ui.css">
+<link rel="stylesheet" href="library.css">
+</head>
+<body>
+<aside class="rail">
+  <div class="brand"><img src="icons/48.png" alt="" width="24" height="24"><span data-app>Tabkept</span></div>
+  <nav aria-label="Library">
+    <a href="#now" data-view="now">Open now <span class="n num" id="nNow"></span></a>
+    <a href="#sessions" data-view="sessions">Sessions <span class="n num" id="nSessions"></span></a>
+    <a href="#timeline" data-view="timeline">Timeline <span class="n num" id="nTimeline"></span></a>
+    <a href="#bin" data-view="bin">Bin <span class="n num" id="nBin"></span></a>
+    <a href="#backups" data-view="backups">Backups and import</a>
+    <a href="#settings" data-view="settings">Settings</a>
+  </nav>
+  <div class="health" id="health" data-state="ok">
+    <span class="hdot"></span>
+    <div><b id="hTitle">Everything is saved</b><span id="hSub" class="num"></span></div>
+  </div>
+</aside>
+
+<main>
+  <section id="v-now" class="view">
+    <header class="vh">
+      <div><h1>Open now</h1><p>Every open window. Name a window here and the name is kept with every save, so you can tell your windows apart later.</p></div>
+      <div class="vh-act"><button class="btn" id="nowSleep">Sleep every tab not in front</button><button class="btn primary" id="nowSave">Save as session</button></div>
+    </header>
+    <div id="nowList" class="stack"></div>
+  </section>
+
+  <section id="v-sessions" class="view" hidden>
+    <header class="vh">
+      <div><h1>Sessions</h1><p>Sessions you save stay until you delete them. Deleted sessions wait in the bin for 30 days. Open a session to add your open windows to it, replace it, or restore only some tabs or one group.</p></div>
+      <div class="vh-act"><button class="btn" id="merge" disabled>Merge selected</button><button class="btn primary" id="sessSave">Save open windows</button></div>
+    </header>
+    <div id="sessList" class="stack"></div>
+    <p id="sessEmpty" class="empty" hidden>No saved sessions yet. Save your open windows with the button above or press Alt+Shift+S anywhere in Chrome.</p>
+  </section>
+
+  <section id="v-timeline" class="view" hidden>
+    <header class="vh">
+      <div><h1>Timeline</h1><p>Saved automatically after every change. Kept: everything from the last 24 hours, one an hour for 7 days, one a day for 90 days.</p></div>
+    </header>
+    <div id="tlList"></div>
+  </section>
+
+  <section id="v-bin" class="view" hidden>
+    <header class="vh">
+      <div><h1>Bin</h1><p>Tabs and windows Tabkept closed, windows you closed with more than one tab, and deleted sessions. Each item stays 30 days.</p></div>
+    </header>
+    <div id="binList" class="stack"></div>
+    <p id="binEmpty" class="empty" hidden>The bin is empty.</p>
+  </section>
+
+  <section id="v-backups" class="view" hidden>
+    <header class="vh">
+      <div><h1>Backups and import</h1><p>Backup files are ordinary files in your Downloads folder. They survive a reinstall or a reset of Chrome, and the page in them opens in any browser.</p></div>
+    </header>
+    <div class="card">
+      <h2>Backup files</h2>
+      <p class="muted" id="bkInfo"></p>
+      <div class="row-act"><button class="btn primary" id="bkNow">Write a backup file now</button><button class="btn" id="bkShow">Show in folder</button><button class="btn" id="bkExport">Export everything</button></div>
+    </div>
+    <div class="card">
+      <h2>Tabs left by a removed extension</h2>
+      <p class="muted" id="rescueInfo"></p>
+      <div class="row-act"><button class="btn" id="rescue" disabled>Send them back to their pages</button></div>
+    </div>
+    <div class="card">
+      <h2>Import</h2>
+      <p class="muted">Reads Tabkept backups, exported session files (JSON, including outliner .tree files), CSV files, Chrome bookmark files, pages of links, and plain lists of web addresses with or without titles. Each imported session is added to Sessions; nothing is replaced.</p>
+      <div class="row-act"><label class="btn" for="file">Choose a file…</label><input type="file" id="file" accept=".json,.txt,.html,.csv,text/*,application/json" hidden></div>
+      <p id="impMsg" class="muted" role="status"></p>
+      <details class="paste"><summary>Or paste the text</summary><textarea id="paste" class="field" rows="6" placeholder="One web address per line, optionally followed by | and a title"></textarea><button class="btn" id="pasteGo">Import pasted text</button></details>
+    </div>
+  </section>
+
+  <section id="v-settings" class="view" hidden>
+    <header class="vh"><div><h1>Settings</h1><p>Changes save as you make them.</p></div></header>
+    <div class="card">
+      <h2>Restoring</h2>
+      <label class="set"><span><b>Open restored tabs asleep</b><small>They appear at once with their icon and title and load when you click them, so a big session does not slow the computer down. Turn off to load every tab straight away. Chrome does not let extensions bring back a tab's back and forward history.</small></span><input type="checkbox" class="switch" id="restoreAsleep"></label>
+    </div>
+    <div class="card">
+      <h2>Sleep tabs to free memory</h2>
+      <label class="set"><span><b>Sleep tabs I haven't looked at</b><small>Uses Chrome's own sleeping, so a tab keeps its address and title and loads again when you click it. Nothing is closed.</small></span><input type="checkbox" class="switch" id="sleepOn"></label>
+      <label class="set"><span><b>After</b></span><select class="field small" id="sleepAfter"><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option><option value="120">2 hours</option><option value="240">4 hours</option><option value="720">12 hours</option></select></label>
+      <label class="set"><span><b>Keep the tab I just left awake for</b></span><select class="field small" id="protectRecent"><option value="0">no time</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="30">30 minutes</option></select></label>
+      <label class="set col"><span><b>Never sleep these sites</b><small>One per line: a site like mail.example.com, *.example.com for all its subdomains, or /a pattern/. Pinned tabs and tabs playing sound never sleep.</small></span><textarea class="field" id="sleepExcept" rows="4" spellcheck="false"></textarea></label>
+    </div>
+    <div class="card">
+      <h2>Backups</h2>
+      <label class="set"><span><b>Write a backup file every hour</b><small>To Downloads/Tabkept. A file with the same tabs as the last one is still written, so the newest file is never older than an hour. Chrome's download bubble stays hidden for the second it takes to write the hourly file, so it does not interrupt you; files you download yourself are not affected.</small></span><input type="checkbox" class="switch" id="backupOn"></label>
+      <label class="set"><span><b>Keep</b></span><select class="field small" id="backupKeep"><option value="24">24 files (1 day)</option><option value="48">48 files (2 days)</option><option value="168">168 files (1 week)</option></select></label>
+    </div>
+    <div class="card">
+      <h2>Duplicates</h2>
+      <label class="set"><span><b>Treat page#part and page as the same page</b><small>Off: two links to different parts of one page both stay open.</small></span><input type="checkbox" class="switch" id="ignoreHash"></label>
+    </div>
+    <div class="card">
+      <h2>Private windows</h2>
+      <label class="set"><span><b>Save incognito windows too</b><small>Off by default. Also needs "Allow in Incognito" on the extension's details page.</small></span><input type="checkbox" class="switch" id="saveIncognito"></label>
+    </div>
+    <div class="card">
+      <h2>Keyboard shortcuts</h2>
+      <p class="muted">Alt+Shift+T opens Tabkept, Alt+Shift+S saves a session, Alt+Shift+Z sleeps the other tabs. On a Mac, Alt is Option.</p>
+      <div class="row-act"><button class="btn" id="shortcuts">Change shortcuts</button></div>
+    </div>
+    <div class="card support" id="support" hidden>
+      <h2>Support Tabkept</h2>
+      <p class="muted">Tabkept is free, and everything in it stays free. If it saved your tabs and you want to say thanks, you can leave a tip or sponsor its development. Nothing changes either way.</p>
+      <div class="row-act"><a class="btn" id="tipLink" target="_blank" rel="noopener" hidden>Leave a tip</a><a class="btn" id="sponsorLink" target="_blank" rel="noopener" hidden>Sponsor on GitHub</a><a class="btn quiet" id="sourceLink" target="_blank" rel="noopener" hidden>Read the source code</a></div>
+    </div>
+    <div class="card">
+      <h2>Delete all saved data</h2>
+      <p class="muted">Removes every save, session, bin item and setting from this browser and stops saving until you start it again. Backup files already in Downloads/Tabkept stay; delete them there if you want them gone too.</p>
+      <div class="row-act"><button class="btn danger" id="wipe">Delete all saved data…</button></div>
+    </div>
+    <div class="card perms">
+      <h2>What Tabkept can access, and why</h2>
+      <dl>
+        <dt>Your open tabs</dt><dd>Their addresses, titles and icons, to save and restore them. Chrome calls this "read your browsing history".</dd>
+        <dt>Tab groups</dt><dd>Names, colours and whether they are collapsed, to bring groups back as they were.</dd>
+        <dt>Storage</dt><dd>Saves, sessions, the bin and settings, kept in this browser.</dd>
+        <dt>Downloads</dt><dd>To write backup files to Downloads/Tabkept and remove its own oldest ones, and to keep the download bubble quiet during hourly backups.</dd>
+        <dt>Alarms</dt><dd>To check saving every minute, write the hourly backup and run the sleep timer.</dd>
+        <dt>Right-click menu</dt><dd>Sleep this tab, sleep the other tabs, never sleep this site, save this window.</dd>
+        <dt>Site icons</dt><dd>Shown from Chrome's own icon cache, so no icon is fetched from a website.</dd>
+        <dt>Background page</dt><dd>Turns a very large backup into a file Chrome can download.</dd>
+      </dl>
+      <p class="muted">Tabkept does not ask for access to the content of any website.</p>
+    </div>
+    <div class="card promises">
+      <h2>What Tabkept will not do</h2>
+      <ul>
+        <li>Ask you to sign up. There is no account.</li>
+        <li>Send anything anywhere. It makes no network requests and has no analytics.</li>
+        <li>Replace your new-tab page, pin a helper tab, or change tab titles.</li>
+        <li>Show donation screens, ratings prompts or promotional notifications.</li>
+        <li>Close a tab without putting it in the bin first.</li>
+        <li>Take away anything that is free today.</li>
+      </ul>
+      <p class="muted">Saves stay in this browser; backup files are ordinary files in your Downloads folder.</p>
+    </div>
+  </section>
+</main>
+
+<dialog id="rename" class="dlg"><form method="dialog"><h2 id="rnTitle">Rename</h2><input class="field" id="rnInput" maxlength="120" required><div class="row-act end"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok">Save</button></div></form></dialog>
+<div class="toast" id="toast" role="status"><span id="toastText"></span><button id="toastAct" hidden>Undo</button></div>
+<script type="module" src="library.js"></script>
+</body>
+</html>

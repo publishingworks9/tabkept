@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tabkept</title>
+<link rel="stylesheet" href="ui.css">
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<header class="top">
+  <img class="mark" src="icons/32.png" alt="" width="20" height="20">
+  <span class="name" data-app>Tabkept</span>
+  <button id="openLib" class="btn quiet" title="Every saved session, the timeline, the bin and settings">Library</button>
+</header>
+
+<section class="state" id="state" data-state="ok" aria-live="polite">
+  <div class="stamp">
+    <span class="seal" aria-hidden="true"><svg viewBox="0 0 20 20"><path class="tick" d="M5.5 10.4 8.6 13.4 14.6 6.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path class="bang" d="M10 5.5v5.4M10 14.3v.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span>
+    <div class="stamp-text">
+      <b id="stateTitle">Everything is saved</b>
+      <span id="stateSub" class="num">Checking…</span>
+    </div>
+  </div>
+  <button class="btn primary startbtn" id="startBtn" hidden>See what Tabkept saves and start</button>
+  <div class="map" id="map" aria-hidden="true"></div>
+  <p class="counts num" id="counts"></p>
+</section>
+
+<div class="search">
+  <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m13.2 13.2 3.3 3.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+  <input id="q" class="field" type="search" placeholder="Search open and saved tabs" aria-label="Search open and saved tabs" autocomplete="off">
+</div>
+
+<div id="results" class="results" hidden></div>
+
+<div id="home">
+  <div class="actions">
+    <button id="saveSession" class="btn">Save session</button>
+    <button id="sleepOthers" class="btn" title="Frees memory. The tabs stay where they are and load again when you click them.">Sleep other tabs</button>
+    <button id="dupes" class="btn" disabled>No duplicates</button>
+  </div>
+
+  <section id="prev" class="prev" hidden>
+    <div>
+      <b>Before Chrome last closed</b>
+      <span id="prevSub" class="num"></span>
+    </div>
+    <button id="prevRestore" class="btn primary">Restore</button>
+  </section>
+
+  <section class="sessions">
+    <h2>Saved sessions</h2>
+    <ul id="sessions"></ul>
+    <p id="noSessions" class="empty" hidden>Sessions you save stay until you delete them. Automatic saves are in the Library timeline.</p>
+  </section>
+</div>
+
+<footer class="foot">
+  <span id="backupLine" class="num"></span>
+  <button id="showFolder" class="btn quiet" hidden>Show file</button>
+</footer>
+
+<div class="toast" id="toast" role="status"><span id="toastText"></span><button id="toastAct" hidden>Undo</button></div>
+<script type="module" src="popup.js"></script>
+</body>
+</html>
